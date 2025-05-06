@@ -61,15 +61,12 @@
 <script>
 import { optimizeArticle } from '../services/apiService';
 import jsdiff from 'diff'; // 需要安装: npm install diff
+import { mapGetters, mapMutations } from 'vuex';
 
 export default {
   name: 'ArticleOptimizer',
   data() {
     return {
-      inputText: '',
-      outputText: '',
-      highlightedOutput: '',
-      errorMessage: '',
       optimizationType: 'readability',
       loading: false,
       loadingDots: '',
@@ -80,6 +77,24 @@ export default {
     }
   },
   computed: {
+    ...mapGetters(['getArticleOptimizerState']),
+    inputText: {
+      get() {
+        return this.getArticleOptimizerState.inputText;
+      },
+      set(value) {
+        this.setArticleOptimizerInput(value);
+      }
+    },
+    outputText() {
+      return this.getArticleOptimizerState.outputText;
+    },
+    highlightedOutput() {
+      return this.getArticleOptimizerState.highlightedOutput;
+    },
+    errorMessage() {
+      return this.getArticleOptimizerState.errorMessage;
+    },
     showOutput() {
       return this.outputText || this.errorMessage;
     }
@@ -88,6 +103,7 @@ export default {
     this.checkUsageLimit();
   },
   methods: {
+    ...mapMutations(['setArticleOptimizerInput', 'setArticleOptimizerOutput', 'clearArticleOptimizer']),
     checkUsageLimit() {
       const today = new Date().toISOString().split('T')[0]; // 获取当前日期，格式为YYYY-MM-DD
       const storedDate = localStorage.getItem('optimizerLastUsageDate');
@@ -131,7 +147,7 @@ export default {
       }
 
       this.loading = true;
-      this.errorMessage = '';
+      this.setArticleOptimizerOutput({ output: '', highlighted: '', error: '' });
       this.startLoadingAnimation();
 
       try {
@@ -142,25 +158,35 @@ export default {
         );
 
         if (result.error) {
-          this.errorMessage = result.text;
-          this.outputText = '';
-          this.highlightedOutput = '';
+          this.setArticleOptimizerOutput({
+            output: '',
+            highlighted: '',
+            error: result.text
+          });
         } else if (!result.text || result.text === '无法获取优化结果') {
-          this.errorMessage = '无法获取优化结果，请点击重试按钮再次尝试';
-          this.outputText = '';
-          this.highlightedOutput = '';
+          this.setArticleOptimizerOutput({
+            output: '',
+            highlighted: '',
+            error: '无法获取优化结果，请点击重试按钮再次尝试'
+          });
         } else {
-          this.outputText = this.extractModifiedText(result.text);
-          this.highlightedOutput = this.generateHighlightedDiff(this.inputText, this.outputText);
-          this.errorMessage = '';
+          const processedOutput = this.extractModifiedText(result.text);
+          const highlightedResult = this.generateHighlightedDiff(this.inputText, processedOutput);
+          this.setArticleOptimizerOutput({
+            output: processedOutput,
+            highlighted: highlightedResult,
+            error: ''
+          });
           // 增加使用次数
           this.incrementUsageCount();
         }
       } catch (error) {
         console.error('优化失败:', error);
-        this.errorMessage = '文章优化失败，请稍后再试';
-        this.outputText = '';
-        this.highlightedOutput = '';
+        this.setArticleOptimizerOutput({
+          output: '',
+          highlighted: '',
+          error: '文章优化失败，请稍后再试'
+        });
       } finally {
         this.loading = false;
         this.stopLoadingAnimation();
@@ -294,10 +320,7 @@ export default {
       this.$message.success('已复制到剪贴板');
     },
     clearAll() {
-      this.inputText = '';
-      this.outputText = '';
-      this.highlightedOutput = '';
-      this.errorMessage = '';
+      this.clearArticleOptimizer();
     },
     startLoadingAnimation() {
       this.loadingDots = '';
