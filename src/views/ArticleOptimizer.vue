@@ -15,9 +15,14 @@
           <span class="usage-text">今日剩余使用次数: {{ usageLimit - usageCount }}/{{ usageLimit }}</span>
         </div>
 
-        <el-button type="primary" @click="optimizeText" :loading="loading" :disabled="usageLimitReached">
-          {{ loading ? `优化中${loadingDots}` : (usageLimitReached ? '今日次数已用完' : '一键优化') }}
-        </el-button>
+        <div class="action-buttons">
+          <el-button type="primary" @click="optimizeText" :loading="loading" :disabled="usageLimitReached">
+            {{ loading ? `优化中${loadingDots}` : (usageLimitReached ? '今日次数已用完' : '一键优化') }}
+          </el-button>
+          <el-tooltip content="自定义API设置" placement="top">
+            <el-button type="info" icon="el-icon-setting" circle @click="openApiSettings"></el-button>
+          </el-tooltip>
+        </div>
       </div>
 
       <div class="output-section" v-if="showOutput">
@@ -46,6 +51,51 @@
         </div>
       </div>
     </el-card>
+
+    <!-- API设置对话框 -->
+    <el-dialog
+      title="自定义API设置"
+      :visible.sync="apiSettingsVisible"
+      width="500px"
+      :close-on-click-modal="false"
+      class="api-settings-dialog"
+    >
+      <el-form :model="apiSettings" label-width="120px" label-position="left">
+        <el-form-item label="API地址">
+          <el-input v-model="apiSettings.apiUrl" placeholder="如: https://api.example.com"></el-input>
+          <div class="form-tip">默认: https://api.closeai.im</div>
+        </el-form-item>
+        
+        <el-form-item label="API密钥">
+          <el-input v-model="apiSettings.apiKey" placeholder="请输入API密钥" show-password></el-input>
+          <div class="form-tip">通常以sk-开头</div>
+        </el-form-item>
+        
+        <el-form-item label="模型名称">
+          <el-input v-model="apiSettings.modelName" placeholder="请输入模型名称"></el-input>
+          <div class="form-tip">默认: gemini-2.5-pro-exp-03-25</div>
+        </el-form-item>
+
+        <div class="api-settings-footer">
+          <el-button @click="resetApiSettings" size="small">恢复默认</el-button>
+          <div class="spacer"></div>
+          <el-button @click="apiSettingsVisible = false">取消</el-button>
+          <el-button type="primary" @click="saveApiSettings">保存</el-button>
+        </div>
+      </el-form>
+
+      <div class="api-settings-info">
+        <el-alert
+          title="什么是自定义API设置?"
+          type="info"
+          description="如果你有自己的API服务或密钥，可以在这里配置。如果不确定这些设置，请保持默认值。"
+          :closable="false"
+          show-icon
+        >
+        </el-alert>
+      </div>
+    </el-dialog>
+
     <div class="contact-info">
       <p>没时间自行优化的可以联系我帮忙优化，邮箱：<a href="mailto:slow@linux.do">slow@linux.do</a></p>
     </div>
@@ -53,7 +103,7 @@
 </template>
 
 <script>
-import { optimizeArticle } from '../services/apiService';
+import { optimizeArticle, getApiConfig, saveApiConfig, resetApiConfig } from '../services/apiService';
 import jsdiff from 'diff'; // 需要安装: npm install diff
 import { mapGetters, mapMutations } from 'vuex';
 
@@ -67,7 +117,14 @@ export default {
       loadingInterval: null,
       usageCount: 0,
       usageLimit: 10,
-      usageLimitReached: false
+      usageLimitReached: false,
+      // API设置相关
+      apiSettingsVisible: false,
+      apiSettings: {
+        apiUrl: '',
+        apiKey: '',
+        modelName: ''
+      }
     }
   },
   computed: {
@@ -95,9 +152,35 @@ export default {
   },
   created() {
     this.checkUsageLimit();
+    this.loadApiSettings();
   },
   methods: {
     ...mapMutations(['setArticleOptimizerInput', 'setArticleOptimizerOutput', 'clearArticleOptimizer']),
+    // API设置相关方法
+    loadApiSettings() {
+      const config = getApiConfig();
+      this.apiSettings.apiUrl = config.apiUrl;
+      this.apiSettings.apiKey = config.apiKey;
+      this.apiSettings.modelName = config.modelName;
+    },
+    openApiSettings() {
+      this.loadApiSettings(); // 确保显示最新设置
+      this.apiSettingsVisible = true;
+    },
+    saveApiSettings() {
+      saveApiConfig(
+        this.apiSettings.apiUrl,
+        this.apiSettings.apiKey,
+        this.apiSettings.modelName
+      );
+      this.$message.success('API设置已保存');
+      this.apiSettingsVisible = false;
+    },
+    resetApiSettings() {
+      resetApiConfig();
+      this.loadApiSettings();
+      this.$message.info('已恢复默认API设置');
+    },
     checkUsageLimit() {
       const today = new Date().toISOString().split('T')[0]; // 获取当前日期，格式为YYYY-MM-DD
       const storedDate = localStorage.getItem('optimizerLastUsageDate');
@@ -424,6 +507,8 @@ export default {
 
 .optimizer-card {
   margin-top: 20px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  border-radius: 8px;
 }
 
 .input-section,
@@ -450,6 +535,12 @@ export default {
   margin-top: 5px;
 }
 
+.action-buttons {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
 .output-actions {
   margin-top: 20px;
   display: flex;
@@ -461,6 +552,7 @@ h1 {
   color: #409EFF;
   text-align: center;
   margin-bottom: 30px;
+  font-weight: 600;
 }
 
 h3 {
@@ -469,10 +561,11 @@ h3 {
 }
 
 .result-container {
-  padding: 10px;
+  padding: 15px;
   background-color: #f8f9fa;
-  border-radius: 4px;
+  border-radius: 8px;
   position: relative;
+  box-shadow: inset 0 0 5px rgba(0, 0, 0, 0.05);
 }
 
 .fixed-textarea>>>.el-textarea__inner {
@@ -480,6 +573,13 @@ h3 {
   overflow-y: scroll !important;
   min-height: 250px;
   max-height: 250px;
+  border-radius: 8px;
+  transition: border-color 0.3s;
+}
+
+.fixed-textarea>>>.el-textarea__inner:hover,
+.fixed-textarea>>>.el-textarea__inner:focus {
+  border-color: #409EFF;
 }
 
 .text-section {
@@ -495,7 +595,7 @@ h3 {
 .text-content {
   white-space: pre-wrap;
   border: 1px solid #DCDFE6;
-  border-radius: 4px;
+  border-radius: 8px;
   padding: 15px;
   background-color: #fff;
   min-height: 100px;
@@ -503,6 +603,11 @@ h3 {
   overflow-y: auto;
   line-height: 1.6;
   font-size: 14px;
+  transition: box-shadow 0.3s;
+}
+
+.text-content:hover {
+  box-shadow: 0 0 8px rgba(64, 158, 255, 0.1);
 }
 
 .text-content::-webkit-scrollbar {
@@ -514,6 +619,10 @@ h3 {
 .text-content::-webkit-scrollbar-thumb {
   background-color: #c0c4cc;
   border-radius: 4px;
+}
+
+.text-content::-webkit-scrollbar-thumb:hover {
+  background-color: #909399;
 }
 
 :deep(.highlight) {
@@ -546,5 +655,45 @@ h3 {
 .contact-info a:hover {
   color: #66b1ff;
   text-decoration: underline;
+}
+
+/* API设置对话框样式 */
+.api-settings-dialog {
+  border-radius: 8px;
+}
+
+.api-settings-dialog >>> .el-dialog__header {
+  padding: 20px 20px 10px;
+  border-bottom: 1px solid #ebeef5;
+}
+
+.api-settings-dialog >>> .el-dialog__body {
+  padding: 20px;
+}
+
+.api-settings-dialog >>> .el-form-item__label {
+  font-weight: 500;
+}
+
+.form-tip {
+  font-size: 12px;
+  color: #909399;
+  margin-top: 4px;
+  line-height: 1.4;
+}
+
+.api-settings-footer {
+  display: flex;
+  align-items: center;
+  margin-top: 20px;
+  margin-bottom: 10px;
+}
+
+.spacer {
+  flex: 1;
+}
+
+.api-settings-info {
+  margin-top: 25px;
 }
 </style>

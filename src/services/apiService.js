@@ -1,9 +1,32 @@
 import axios from 'axios';
 
-const API_URL = 'https://api.closeai.im';
-// 这里的API_KEY可能不正确，需要使用实际的密钥
-const API_KEY = 'sk-eFrsoPsuchMQR3FlRaTlvWJkah4GWkAeXx3ASeiyOKR3H6Ge'; // 替换为实际API密钥
-const MODEL_NAME = 'gemini-2.5-pro-exp-03-25';
+// 默认值，将被用户自定义配置覆盖
+const DEFAULT_API_URL = 'https://api.closeai.im';
+const DEFAULT_API_KEY = 'sk-eFrsoPsuchMQR3FlRaTlvWJkah4GWkAeXx3ASeiyOKR3H6Ge'; // 替换为实际API密钥
+const DEFAULT_MODEL_NAME = 'gemini-2.5-pro-exp-03-25';
+
+// 从本地存储获取API配置
+export const getApiConfig = () => {
+  return {
+    apiUrl: localStorage.getItem('customApiUrl') || DEFAULT_API_URL,
+    apiKey: localStorage.getItem('customApiKey') || DEFAULT_API_KEY,
+    modelName: localStorage.getItem('customModelName') || DEFAULT_MODEL_NAME,
+  };
+};
+
+// 保存API配置到本地存储
+export const saveApiConfig = (apiUrl, apiKey, modelName) => {
+  if (apiUrl) localStorage.setItem('customApiUrl', apiUrl);
+  if (apiKey) localStorage.setItem('customApiKey', apiKey);
+  if (modelName) localStorage.setItem('customModelName', modelName);
+};
+
+// 重置API配置到默认值
+export const resetApiConfig = () => {
+  localStorage.removeItem('customApiUrl');
+  localStorage.removeItem('customApiKey');
+  localStorage.removeItem('customModelName');
+};
 
 // 文章优化的完整提示词
 const COMPLETE_PROMPT = `你的角色与目标：
@@ -84,6 +107,9 @@ export const optimizeArticle = async (content, prompt, type, maxRetries = 3) => 
   // 使用完整的提示词
   const fullPrompt = COMPLETE_PROMPT;
   
+  // 获取当前的API配置
+  const { apiUrl, apiKey, modelName } = getApiConfig();
+  
   const makeRequest = async () => {
     try {
       console.log('开始API调用，重试次数:', retries);
@@ -93,15 +119,16 @@ export const optimizeArticle = async (content, prompt, type, maxRetries = 3) => 
       const top_p = 0.97;
       
       console.log('使用参数:', { 
-        model: MODEL_NAME, 
+        apiUrl,
+        model: modelName, 
         temperature, 
         top_p,
         contentLength: content.length,
         typeOfOptimization: type
       });
       
-      const response = await axios.post(`${API_URL}/v1/chat/completions`, {
-        model: MODEL_NAME,
+      const response = await axios.post(`${apiUrl}/v1/chat/completions`, {
+        model: modelName,
         messages: [
           {
             role: "system",
@@ -118,7 +145,7 @@ export const optimizeArticle = async (content, prompt, type, maxRetries = 3) => 
       }, {
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${API_KEY}`
+          'Authorization': `Bearer ${apiKey}`
         }
       });
       
