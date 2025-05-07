@@ -10,9 +10,11 @@
 
       <div class="action-section">
         <div class="usage-info">
-          <el-progress :percentage="(usageCount / usageLimit) * 100" :format="format"
-            :status="usageLimitReached ? 'exception' : null"></el-progress>
-          <span class="usage-text">今日剩余使用次数: {{ usageLimit - usageCount }}/{{ usageLimit }}</span>
+          <el-progress :percentage="hasCustomApiConfig ? 100 : (usageCount / usageLimit) * 100" :format="format"
+            :status="hasCustomApiConfig ? 'success' : (usageLimitReached ? 'exception' : null)"></el-progress>
+          <span class="usage-text" v-if="!hasCustomApiConfig">今日剩余使用次数: {{ usageLimit - usageCount }}/{{ usageLimit
+            }}</span>
+          <span class="usage-text custom-api-text" v-else>使用自定义API，不受次数限制</span>
         </div>
 
         <div class="action-buttons">
@@ -70,6 +72,12 @@
           <el-input v-model="apiSettings.modelName" placeholder="请输入模型名称"></el-input>
           <div class="form-tip">默认: gemini-2.5-pro-exp-03-25</div>
         </el-form-item>
+
+        <div class="api-vip-tip">
+          <el-alert type="success" show-icon title="使用自定义API可享受无限制使用权限"
+            description="当您同时设置了自定义API地址和API密钥，将不受每日使用次数的限制。" :closable="false">
+          </el-alert>
+        </div>
 
         <div class="api-settings-footer">
           <el-button @click="resetApiSettings" size="small">恢复默认</el-button>
@@ -138,6 +146,12 @@ export default {
     },
     showOutput() {
       return this.outputText && !this.errorMessage;
+    },
+    // 检查用户是否使用自定义API (同时提供了API地址和API密钥)
+    hasCustomApiConfig() {
+      const customApiUrl = localStorage.getItem('customApiUrl');
+      const customApiKey = localStorage.getItem('customApiKey');
+      return !!(customApiUrl && customApiKey);
     }
   },
   created() {
@@ -164,6 +178,10 @@ export default {
         this.apiSettings.apiKey,
         this.apiSettings.modelName
       );
+
+      // 保存后重新检查使用限制，如果用户填写了自定义API信息，需要刷新显示
+      this.checkUsageLimit();
+
       this.$message.success('API设置已保存');
       this.apiSettingsVisible = false;
     },
@@ -173,6 +191,13 @@ export default {
       this.$message.info('已恢复默认API设置');
     },
     checkUsageLimit() {
+      // 如果用户同时提供了自定义API地址和密钥，则不受使用次数限制
+      if (this.hasCustomApiConfig) {
+        this.usageCount = 0;
+        this.usageLimitReached = false;
+        return;
+      }
+
       const today = new Date().toISOString().split('T')[0]; // 获取当前日期，格式为YYYY-MM-DD
       const storedDate = localStorage.getItem('optimizerLastUsageDate');
       const storedCount = localStorage.getItem('optimizerUsageCount');
@@ -192,9 +217,18 @@ export default {
       }
     },
     format(percentage) {
+      // 如果用户使用自定义API，显示不受限制的信息
+      if (this.hasCustomApiConfig) {
+        return '不受限制';
+      }
       return this.usageLimitReached ? '已用完' : `${this.usageCount}/${this.usageLimit}`;
     },
     incrementUsageCount() {
+      // 如果用户使用自定义API，不增加使用次数
+      if (this.hasCustomApiConfig) {
+        return;
+      }
+
       this.usageCount++;
       localStorage.setItem('optimizerUsageCount', this.usageCount.toString());
 
@@ -208,8 +242,8 @@ export default {
         return;
       }
 
-      // 检查使用次数限制
-      if (this.usageLimitReached) {
+      // 检查使用次数限制 (仅对非自定义API用户)
+      if (!this.hasCustomApiConfig && this.usageLimitReached) {
         this.$message.error(`每天最多只能使用${this.usageLimit}次优化功能，请明天再来`);
         return;
       }
@@ -536,6 +570,15 @@ export default {
   font-size: 12px;
   color: #606266;
   margin-top: 5px;
+}
+
+.custom-api-text {
+  color: #67c23a;
+  font-weight: bold;
+}
+
+.api-vip-tip {
+  margin: 15px 0;
 }
 
 .action-buttons {
