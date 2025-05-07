@@ -16,9 +16,26 @@ export const getApiConfig = () => {
 
 // 保存API配置到本地存储
 export const saveApiConfig = (apiUrl, apiKey, modelName) => {
-  if (apiUrl) localStorage.setItem('customApiUrl', apiUrl);
-  if (apiKey) localStorage.setItem('customApiKey', apiKey);
-  if (modelName) localStorage.setItem('customModelName', modelName);
+  // 处理API地址
+  if (apiUrl && apiUrl.trim()) {
+    localStorage.setItem('customApiUrl', apiUrl.trim());
+  } else {
+    localStorage.removeItem('customApiUrl');
+  }
+  
+  // 处理API密钥
+  if (apiKey && apiKey.trim()) {
+    localStorage.setItem('customApiKey', apiKey.trim());
+  } else {
+    localStorage.removeItem('customApiKey');
+  }
+  
+  // 处理模型名称
+  if (modelName && modelName.trim()) {
+    localStorage.setItem('customModelName', modelName.trim());
+  } else {
+    localStorage.removeItem('customModelName');
+  }
 };
 
 // 重置API配置到默认值

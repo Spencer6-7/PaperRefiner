@@ -179,6 +179,9 @@ export default {
       this.apiSettingsVisible = true;
     },
     saveApiSettings() {
+      // 检查是否从自定义API切换到默认API
+      const wasCustom = this.hasCustomApiConfig;
+
       saveApiConfig(
         this.apiSettings.apiUrl,
         this.apiSettings.apiKey,
@@ -188,13 +191,47 @@ export default {
       // 保存后重新检查使用限制，如果用户填写了自定义API信息，需要刷新显示
       this.checkUsageLimit();
 
-      this.$message.success('API设置已保存');
+      // 检查现在的状态，判断是否需要显示额外提示
+      if (wasCustom && !this.hasCustomApiConfig) {
+        // 用户清空了API地址或API密钥，从自定义API切换回默认API
+        this.$message({
+          message: 'API设置已保存，您已切换回默认API，将受到每日使用次数限制',
+          type: 'warning',
+          duration: 3000
+        });
+      } else if (!wasCustom && this.hasCustomApiConfig) {
+        // 用户新增了自定义API配置
+        this.$message({
+          message: 'API设置已保存，您现在是高级用户，不受使用次数限制',
+          type: 'success',
+          duration: 3000
+        });
+      } else {
+        // 保持相同状态，只是更新了信息
+        this.$message.success('API设置已保存');
+      }
+
       this.apiSettingsVisible = false;
     },
     resetApiSettings() {
+      // 检查是否从自定义API切换到默认API
+      const wasCustom = this.hasCustomApiConfig;
+
       resetApiConfig();
       this.loadApiSettings();
-      this.$message.info('已恢复默认API设置');
+
+      // 重新检查使用限制，在切换回默认API时恢复使用次数限制
+      this.checkUsageLimit();
+
+      if (wasCustom) {
+        this.$message({
+          message: '已恢复默认API设置，将受到每日使用次数限制',
+          type: 'warning',
+          duration: 3000
+        });
+      } else {
+        this.$message.info('已恢复默认API设置');
+      }
     },
     checkUsageLimit() {
       // 如果用户同时提供了自定义API地址和密钥，则不受使用次数限制
