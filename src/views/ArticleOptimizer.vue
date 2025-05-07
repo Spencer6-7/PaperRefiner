@@ -10,11 +10,17 @@
 
       <div class="action-section">
         <div class="usage-info">
-          <el-progress :percentage="hasCustomApiConfig ? 100 : (usageCount / usageLimit) * 100" :format="format"
-            :status="hasCustomApiConfig ? 'success' : (usageLimitReached ? 'exception' : null)"></el-progress>
-          <span class="usage-text" v-if="!hasCustomApiConfig">今日剩余使用次数: {{ usageLimit - usageCount }}/{{ usageLimit
-            }}</span>
-          <span class="usage-text custom-api-text" v-else>使用自定义API，不受次数限制</span>
+          <template v-if="!hasCustomApiConfig">
+            <el-progress :percentage="(usageCount / usageLimit) * 100" :format="format"
+              :status="usageLimitReached ? 'exception' : null"></el-progress>
+            <span class="usage-text">今日剩余使用次数: {{ usageLimit - usageCount }}/{{ usageLimit }}</span>
+          </template>
+          <template v-else>
+            <div class="vip-badge">
+              <i class="el-icon-star-on"></i> 高级用户
+            </div>
+            <span class="usage-text custom-api-text">使用自定义API，不受次数限制</span>
+          </template>
         </div>
 
         <div class="action-buttons">
@@ -575,6 +581,24 @@ export default {
 .custom-api-text {
   color: #67c23a;
   font-weight: bold;
+}
+
+.vip-badge {
+  background-color: #67c23a;
+  color: white;
+  padding: 5px 10px;
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: bold;
+  margin-bottom: 5px;
+  display: inline-flex;
+  align-items: center;
+  max-width: fit-content;
+}
+
+.vip-badge i {
+  margin-right: 5px;
+  font-size: 16px;
 }
 
 .api-vip-tip {
