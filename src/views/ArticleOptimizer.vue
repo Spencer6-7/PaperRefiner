@@ -58,7 +58,7 @@
       <el-form :model="apiSettings" label-width="120px" label-position="left">
         <el-form-item label="API地址">
           <el-input v-model="apiSettings.apiUrl" placeholder="如: https://api.example.com"></el-input>
-          <div class="form-tip">默认: https://api.closeai.im</div>
+          <div class="form-tip">默认: https://voapi.killerbest.com</div>
         </el-form-item>
 
         <el-form-item label="API密钥">
@@ -149,9 +149,10 @@ export default {
     // API设置相关方法
     loadApiSettings() {
       const config = getApiConfig();
-      this.apiSettings.apiUrl = config.apiUrl;
-      this.apiSettings.apiKey = config.apiKey;
-      this.apiSettings.modelName = config.modelName;
+      // 首次打开对话框时不显示默认值，保护系统安全
+      this.apiSettings.apiUrl = localStorage.getItem('customApiUrl') || '';
+      this.apiSettings.apiKey = localStorage.getItem('customApiKey') || '';
+      this.apiSettings.modelName = localStorage.getItem('customModelName') || '';
     },
     openApiSettings() {
       this.loadApiSettings(); // 确保显示最新设置
