@@ -66,7 +66,7 @@ export default {
       loadingDots: '',
       loadingInterval: null,
       usageCount: 0,
-      usageLimit: 10,
+      usageLimit: 20,
       usageLimitReached: false
     }
   },
