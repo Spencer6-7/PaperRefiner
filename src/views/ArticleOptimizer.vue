@@ -24,30 +24,24 @@
         <h3>优化结果</h3>
         <el-divider></el-divider>
         <div class="result-container">
-          <div v-if="errorMessage" class="error-message">
-            <p>{{ errorMessage }}</p>
-            <el-button type="primary" @click="optimizeText" size="small">重试</el-button>
+          <div class="text-section">
+            <div class="text-label">原文:</div>
+            <div class="text-content">{{ inputText }}</div>
           </div>
-          <div v-else>
-            <div class="text-section">
-              <div class="text-label">原文:</div>
-              <div class="text-content">{{ inputText }}</div>
-            </div>
 
-            <el-divider content-position="center">优化结果</el-divider>
+          <el-divider content-position="center">优化结果</el-divider>
 
-            <div class="text-section">
-              <div class="text-label">修改后:</div>
-              <div class="text-content modified-content" v-html="highlightedOutput"></div>
-            </div>
+          <div class="text-section">
+            <div class="text-label">修改后:</div>
+            <div class="text-content modified-content" v-html="highlightedOutput"></div>
+          </div>
 
-            <div class="output-actions">
-              <el-button type="primary" @click="regenerate" :loading="loading" size="small">
-                <i class="el-icon-refresh-right"></i> 重新生成
-              </el-button>
-              <el-button type="success" @click="copyToClipboard" size="small">复制结果</el-button>
-              <el-button @click="clearAll" size="small">清空</el-button>
-            </div>
+          <div class="output-actions">
+            <el-button type="primary" @click="regenerate" :loading="loading" size="small">
+              <i class="el-icon-refresh-right"></i> 重新生成
+            </el-button>
+            <el-button type="success" @click="copyToClipboard" size="small">复制结果</el-button>
+            <el-button @click="clearAll" size="small">清空</el-button>
           </div>
         </div>
       </div>
@@ -96,7 +90,7 @@ export default {
       return this.getArticleOptimizerState.errorMessage;
     },
     showOutput() {
-      return this.outputText || this.errorMessage;
+      return this.outputText && !this.errorMessage;
     }
   },
   created() {
@@ -158,19 +152,30 @@ export default {
         );
 
         if (result.error) {
-          this.setArticleOptimizerOutput({
-            output: '',
-            highlighted: '',
-            error: result.text
-          });
+          this.$message.error(result.text);
+          this.loading = false;
+          this.stopLoadingAnimation();
+          return;
         } else if (!result.text) {
-          this.setArticleOptimizerOutput({
-            output: '',
-            highlighted: '',
-            error: '无法获取优化结果，请点击重试按钮再次尝试'
-          });
+          this.$message.error('无法获取优化结果，请稍后再试');
+          this.loading = false;
+          this.stopLoadingAnimation();
+          return;
+        } else if (this.isEmptyResult(result.text)) {
+          // 检测到类似"修改后:"和"无法获取优化结果"的格式
+          this.$message.error('无法获取优化结果，请稍后再试');
+          this.loading = false;
+          this.stopLoadingAnimation();
+          return;
         } else {
           const processedOutput = this.extractModifiedText(result.text);
+          // 如果处理后的输出为空，则说明在extractModifiedText中已显示了错误提示
+          if (!processedOutput) {
+            this.loading = false;
+            this.stopLoadingAnimation();
+            return;
+          }
+
           const highlightedResult = this.generateHighlightedDiff(this.inputText, processedOutput);
           this.setArticleOptimizerOutput({
             output: processedOutput,
@@ -182,15 +187,29 @@ export default {
         }
       } catch (error) {
         console.error('优化失败:', error);
-        this.setArticleOptimizerOutput({
-          output: '',
-          highlighted: '',
-          error: '文章优化失败，请稍后再试'
-        });
+        this.$message.error('文章优化失败，请稍后再试');
+        this.loading = false;
+        this.stopLoadingAnimation();
+        return;
       } finally {
         this.loading = false;
         this.stopLoadingAnimation();
       }
+    },
+    isEmptyResult(text) {
+      // 检测是否为空结果或包含"无法获取优化结果"的特殊情况
+      const lines = text.split('\n').map(line => line.trim()).filter(line => line);
+
+      // 图片中显示的格式检测
+      if (
+        (lines.length <= 3) &&
+        (text.includes('优化结果') || text.includes('修改后')) &&
+        (text.includes('无法获取优化结果') || text.includes('无法') || text.includes('获取失败'))
+      ) {
+        return true;
+      }
+
+      return false;
     },
     async regenerate() {
       if (!this.inputText.trim()) {
@@ -207,12 +226,25 @@ export default {
       await this.optimizeText();
     },
     extractModifiedText(text) {
+      // 检查返回内容是否为"无法获取优化结果"字样
+      if (text.includes('无法获取优化结果') || text.trim() === '修改后:') {
+        // 如果包含这个字样，通过toast提示并返回空字符串
+        this.$message.error('无法获取优化结果，请稍后再试');
+        return '';
+      }
+
       // 检查AI返回的内容格式
       // 如果AI已经按要求返回了"修改后"格式的内容
       const modifiedPattern = /修改后[:：]([\s\S]*)/;
       const match = text.match(modifiedPattern);
       if (match && match[1]) {
-        return match[1].trim();
+        const result = match[1].trim();
+        // 检查提取后的内容是否为空或过短
+        if (!result || result.length < 5) {
+          this.$message.error('无法获取优化结果，请稍后再试');
+          return '';
+        }
+        return result;
       }
 
       // 如果没有找到"修改后"标记，则保留完整内容
@@ -388,12 +420,6 @@ h3 {
   background-color: #f8f9fa;
   border-radius: 4px;
   position: relative;
-}
-
-.error-message {
-  color: #F56C6C;
-  text-align: center;
-  padding: 20px;
 }
 
 .fixed-textarea>>>.el-textarea__inner {

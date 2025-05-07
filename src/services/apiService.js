@@ -1,8 +1,8 @@
 import axios from 'axios';
 
-const API_URL = 'https://x666.me';
+const API_URL = 'https://api.closeai.im/';
 // 这里的API_KEY可能不正确，需要使用实际的密钥
-const API_KEY = 'sk-Zi3sp9jpcz63HcFAz8jxCn2NrgPxRlRxfSSXqhh8JU4IEMn9'; // 替换为实际API密钥
+const API_KEY = 'sk-eFrsoPsuchMQR3FlRaTlvWJkah4GWkAeXx3ASeiyOKR3H6Ge'; // 替换为实际API密钥
 const MODEL_NAME = 'gemini-2.5-pro-exp-03-25';
 
 // 文章优化的完整提示词
