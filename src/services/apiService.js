@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_URL = 'https://api.closeai.im/';
+const API_URL = 'https://api.closeai.im';
 // 这里的API_KEY可能不正确，需要使用实际的密钥
 const API_KEY = 'sk-eFrsoPsuchMQR3FlRaTlvWJkah4GWkAeXx3ASeiyOKR3H6Ge'; // 替换为实际API密钥
 const MODEL_NAME = 'gemini-2.5-pro-exp-03-25';
@@ -127,9 +127,17 @@ export const optimizeArticle = async (content, prompt, type, maxRetries = 3) => 
       // 提取返回文本
       const responseText = response.data.choices?.[0]?.message?.content || '';
       
+      // 添加详细的响应内容日志，帮助调试
+      console.log('API响应内容:', {
+        hasContent: !!responseText,
+        contentLength: responseText.length,
+        contentPreview: responseText.substring(0, 100) + (responseText.length > 100 ? '...' : ''),
+        fullResponse: response.data
+      });
+      
       // 移除短文本检查，避免因文本长度限制而重试
       return {
-        text: responseText || '无法获取优化结果'
+        text: responseText || '内容优化服务暂时不可用，请稍后重试'
       };
     } catch (error) {
       console.error(`API调用错误(尝试 ${retries+1}/${maxRetries}):`, error);

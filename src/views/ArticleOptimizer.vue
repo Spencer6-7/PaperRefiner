@@ -66,7 +66,7 @@ export default {
       loadingDots: '',
       loadingInterval: null,
       usageCount: 0,
-      usageLimit: 5,
+      usageLimit: 10,
       usageLimitReached: false
     }
   },
@@ -151,19 +151,28 @@ export default {
           this.optimizationType
         );
 
+        console.log('优化结果完整响应:', result);
+
         if (result.error) {
           this.$message.error(result.text);
           this.loading = false;
           this.stopLoadingAnimation();
           return;
         } else if (!result.text) {
-          this.$message.error('无法获取优化结果，请稍后再试');
+          this.$message.error('优化服务暂时不可用，请稍后重试');
+          this.loading = false;
+          this.stopLoadingAnimation();
+          return;
+        } else if (result.text === '内容优化服务暂不可用，请稍后重试') {
+          // 处理特定的错误消息，这是截图中显示的错误
+          console.log('API返回了特定的服务不可用消息');
+          this.$message.error('AI服务过载，请稍等片刻再试');
           this.loading = false;
           this.stopLoadingAnimation();
           return;
         } else if (this.isEmptyResult(result.text)) {
           // 检测到类似"修改后:"和"无法获取优化结果"的格式
-          this.$message.error('无法获取优化结果，请稍后再试');
+          this.$message.error('内容优化未成功，可能是网络问题或服务繁忙');
           this.loading = false;
           this.stopLoadingAnimation();
           return;
@@ -176,6 +185,12 @@ export default {
             return;
           }
 
+          // 记录处理后的文本
+          console.log('处理后的输出:', {
+            length: processedOutput.length,
+            preview: processedOutput.substring(0, 100) + (processedOutput.length > 100 ? '...' : '')
+          });
+
           const highlightedResult = this.generateHighlightedDiff(this.inputText, processedOutput);
           this.setArticleOptimizerOutput({
             output: processedOutput,
@@ -187,7 +202,7 @@ export default {
         }
       } catch (error) {
         console.error('优化失败:', error);
-        this.$message.error('文章优化失败，请稍后再试');
+        this.$message.error('文章优化失败，可能是网络不稳定或服务器繁忙');
         this.loading = false;
         this.stopLoadingAnimation();
         return;
@@ -199,6 +214,8 @@ export default {
     isEmptyResult(text) {
       // 检测是否为空结果或包含"无法获取优化结果"的特殊情况
       const lines = text.split('\n').map(line => line.trim()).filter(line => line);
+
+      console.log('检查是否为空结果:', { lines: lines.slice(0, 3), totalLines: lines.length });
 
       // 图片中显示的格式检测
       if (
@@ -226,10 +243,31 @@ export default {
       await this.optimizeText();
     },
     extractModifiedText(text) {
+      // 输出原始文本进行调试
+      console.log('解析的原始文本:', {
+        textLength: text.length,
+        textPreview: text.substring(0, 200) + (text.length > 200 ? '...' : '')
+      });
+
+      // 检查返回内容是否包含特定的错误信息
+      if (text.includes('内容优化服务暂时不可用') || text.includes('请稍后重试')) {
+        console.log('检测到特定的服务不可用消息');
+        // 如果AI返回了服务不可用的消息，显示更有帮助的错误提示
+        this.$message.error('内容优化服务响应异常，请等待几分钟后再尝试');
+        return '';
+      }
+
       // 检查返回内容是否为"无法获取优化结果"字样
       if (text.includes('无法获取优化结果') || text.trim() === '修改后:') {
         // 如果包含这个字样，通过toast提示并返回空字符串
-        this.$message.error('无法获取优化结果，请稍后再试');
+        this.$message.error('优化未完成，请检查网络连接并稍后再试');
+        return '';
+      }
+
+      // 检查是否包含"原文"但缺少"修改后"的情况
+      if (text.includes('原文') && !text.includes('修改后')) {
+        console.log('响应中包含原文但缺少修改后部分');
+        this.$message.error('AI服务未能完成内容优化，请稍后重试');
         return '';
       }
 
@@ -237,14 +275,29 @@ export default {
       // 如果AI已经按要求返回了"修改后"格式的内容
       const modifiedPattern = /修改后[:：]([\s\S]*)/;
       const match = text.match(modifiedPattern);
+
+      // 记录匹配结果
+      console.log('修改后匹配结果:', {
+        hasMatch: !!match,
+        matchGroups: match ? match.length : 0,
+        matchContent: match ? match[1]?.substr(0, 100) + (match[1]?.length > 100 ? '...' : '') : 'No match'
+      });
+
       if (match && match[1]) {
         const result = match[1].trim();
         // 检查提取后的内容是否为空或过短
         if (!result || result.length < 5) {
-          this.$message.error('无法获取优化结果，请稍后再试');
+          this.$message.error('优化结果异常，请尝试刷新页面或稍后重试');
           return '';
         }
         return result;
+      }
+
+      // 尝试另一种常见模式：直接返回优化后的文本而没有"修改后:"标记
+      // 如果文本看起来像是合理的优化结果（不太短并且没有诊断性消息）
+      if (text && text.length > this.inputText.length / 2 && !text.includes('无法') && !text.includes('error')) {
+        console.log('没有找到"修改后"标记，但返回了看起来合理的内容');
+        return this.cleanMarkdown(text);
       }
 
       // 如果没有找到"修改后"标记，则保留完整内容
