@@ -157,7 +157,15 @@ export default {
     hasCustomApiConfig() {
       const customApiUrl = localStorage.getItem('customApiUrl');
       const customApiKey = localStorage.getItem('customApiKey');
-      return !!(customApiUrl && customApiKey);
+      const result = !!(customApiUrl && customApiKey);
+
+      console.log('检查自定义API配置状态:', {
+        customApiUrl: customApiUrl || '(未设置)',
+        customApiKey: customApiKey ? '已设置' : '未设置',
+        结果: result ? '使用自定义API' : '使用默认API'
+      });
+
+      return result;
     }
   },
   created() {
@@ -181,6 +189,11 @@ export default {
     saveApiSettings() {
       // 检查是否从自定义API切换到默认API
       const wasCustom = this.hasCustomApiConfig;
+      console.log('保存前状态:', {
+        使用自定义API: wasCustom,
+        apiUrl: this.apiSettings.apiUrl || '(空)',
+        apiKey: this.apiSettings.apiKey ? '已设置' : '(空)'
+      });
 
       saveApiConfig(
         this.apiSettings.apiUrl,
@@ -190,6 +203,14 @@ export default {
 
       // 保存后重新检查使用限制，如果用户填写了自定义API信息，需要刷新显示
       this.checkUsageLimit();
+
+      // 检查localStorage中是否成功保存了设置
+      console.log('保存后状态:', {
+        使用自定义API: this.hasCustomApiConfig,
+        存储中_apiUrl: localStorage.getItem('customApiUrl') || '(空)',
+        存储中_apiKey: localStorage.getItem('customApiKey') ? '已设置' : '(空)',
+        usageLimitReached: this.usageLimitReached
+      });
 
       // 检查现在的状态，判断是否需要显示额外提示
       if (wasCustom && !this.hasCustomApiConfig) {
@@ -236,11 +257,13 @@ export default {
     checkUsageLimit() {
       // 如果用户同时提供了自定义API地址和密钥，则不受使用次数限制
       if (this.hasCustomApiConfig) {
+        console.log('检测到自定义API配置，重置使用限制');
         this.usageCount = 0;
         this.usageLimitReached = false;
         return;
       }
 
+      console.log('使用默认API，检查使用次数限制');
       const today = new Date().toISOString().split('T')[0]; // 获取当前日期，格式为YYYY-MM-DD
       const storedDate = localStorage.getItem('optimizerLastUsageDate');
       const storedCount = localStorage.getItem('optimizerUsageCount');
