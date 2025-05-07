@@ -1,8 +1,8 @@
 import axios from 'axios';
 
-const API_URL = 'https://voapi.killerbest.com';
+const API_URL = 'https://x666.me';
 // 这里的API_KEY可能不正确，需要使用实际的密钥
-const API_KEY = 'sk-Cq5WduWuNxp1dNgoB8HmfqqoB3kCW2SBXbMJgP61xn8Hr6II'; // 替换为实际API密钥
+const API_KEY = 'sk-Zi3sp9jpcz63HcFAz8jxCn2NrgPxRlRxfSSXqhh8JU4IEMn9'; // 替换为实际API密钥
 const MODEL_NAME = 'gemini-2.5-pro-exp-03-25';
 
 // 文章优化的完整提示词
@@ -114,7 +114,7 @@ export const optimizeArticle = async (content, prompt, type, maxRetries = 3) => 
         ],
         temperature: temperature,
         top_p: top_p,
-        max_tokens: 4000
+        max_tokens: 8192  // 增加最大token限制，防止截断
       }, {
         headers: {
           'Content-Type': 'application/json',
@@ -127,17 +127,7 @@ export const optimizeArticle = async (content, prompt, type, maxRetries = 3) => 
       // 提取返回文本
       const responseText = response.data.choices?.[0]?.message?.content || '';
       
-      if (responseText.length < 20) {
-        console.warn('返回文本过短:', responseText);
-        if (retries < maxRetries - 1) {
-          retries++;
-          console.log(`返回内容过短，正在重试(${retries}/${maxRetries})...`);
-          // 短暂延迟后重试
-          await new Promise(resolve => setTimeout(resolve, 1000));
-          return await makeRequest(); // 重试
-        }
-      }
-      
+      // 移除短文本检查，避免因文本长度限制而重试
       return {
         text: responseText || '无法获取优化结果'
       };

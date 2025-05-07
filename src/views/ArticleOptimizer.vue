@@ -72,7 +72,7 @@ export default {
       loadingDots: '',
       loadingInterval: null,
       usageCount: 0,
-      usageLimit: 3,
+      usageLimit: 5,
       usageLimitReached: false
     }
   },
@@ -163,7 +163,7 @@ export default {
             highlighted: '',
             error: result.text
           });
-        } else if (!result.text || result.text === '无法获取优化结果') {
+        } else if (!result.text) {
           this.setArticleOptimizerOutput({
             output: '',
             highlighted: '',
@@ -207,36 +207,25 @@ export default {
       await this.optimizeText();
     },
     extractModifiedText(text) {
-      // 尝试提取"修改后:"之后的文本
+      // 检查AI返回的内容格式
+      // 如果AI已经按要求返回了"修改后"格式的内容
       const modifiedPattern = /修改后[:：]([\s\S]*)/;
       const match = text.match(modifiedPattern);
       if (match && match[1]) {
         return match[1].trim();
       }
 
-      // 尝试提取任何标记后的文本
-      const anyLabelPattern = /^.*[:：]([^:：]*[\n\r]+[\s\S]*)/;
-      const labelMatch = text.match(anyLabelPattern);
-      if (labelMatch && labelMatch[1]) {
-        return labelMatch[1].trim();
-      }
-
-      // 移除常见的markdown标记
+      // 如果没有找到"修改后"标记，则保留完整内容
+      // 只做基本的清理，避免丢失内容
       return this.cleanMarkdown(text);
     },
     cleanMarkdown(text) {
-      // 移除常见的markdown标记
+      // 只移除明显的markdown标记，保留所有实际内容
       return text
         .replace(/\*\*(.*?)\*\*/g, '$1') // 移除粗体 **text**
         .replace(/\*(.*?)\*/g, '$1')     // 移除斜体 *text*
         .replace(/```.*?```/gs, '')      // 移除代码块
         .replace(/`(.*?)`/g, '$1')       // 移除内联代码
-        .replace(/^#+\s+/gm, '')         // 移除标题标记 # Heading
-        .replace(/^\s*[-*+]\s+/gm, '')   // 移除列表标记
-        .replace(/^\s*\d+\.\s+/gm, '')   // 移除有序列表标记
-        .replace(/\[(.*?)\]\(.*?\)/g, '$1') // 移除链接，只保留文本
-        .replace(/!\[(.*?)\]\(.*?\)/g, '')  // 移除图片
-        .replace(/^>\s+/gm, '')          // 移除引用标记
         .trim();
     },
     generateHighlightedDiff(originalText, modifiedText) {
