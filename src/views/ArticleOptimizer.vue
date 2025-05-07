@@ -219,13 +219,19 @@ export default {
       this.startLoadingAnimation();
 
       try {
+        // 缓存输入文本，避免重复访问
+        const inputText = this.inputText;
+
         const result = await optimizeArticle(
-          this.inputText,
+          inputText,
           null, // 提示词已在API服务中定义
           this.optimizationType
         );
 
-        console.log('优化结果完整响应:', result);
+        // 在生产环境中减少不必要的日志输出
+        if (process.env.NODE_ENV !== 'production') {
+          console.log('优化结果完整响应:', result);
+        }
 
         if (result.error) {
           this.$message.error(result.text);
@@ -239,7 +245,9 @@ export default {
           return;
         } else if (result.text === '内容优化服务暂不可用，请稍后重试') {
           // 处理特定的错误消息，这是截图中显示的错误
-          console.log('API返回了特定的服务不可用消息');
+          if (process.env.NODE_ENV !== 'production') {
+            console.log('API返回了特定的服务不可用消息');
+          }
           this.$message.error('AI服务过载，请稍等片刻再试');
           this.loading = false;
           this.stopLoadingAnimation();
@@ -259,13 +267,15 @@ export default {
             return;
           }
 
-          // 记录处理后的文本
-          console.log('处理后的输出:', {
-            length: processedOutput.length,
-            preview: processedOutput.substring(0, 100) + (processedOutput.length > 100 ? '...' : '')
-          });
+          // 仅在开发环境中输出日志
+          if (process.env.NODE_ENV !== 'production') {
+            console.log('处理后的输出:', {
+              length: processedOutput.length,
+              preview: processedOutput.substring(0, 100) + (processedOutput.length > 100 ? '...' : '')
+            });
+          }
 
-          const highlightedResult = this.generateHighlightedDiff(this.inputText, processedOutput);
+          const highlightedResult = this.generateHighlightedDiff(inputText, processedOutput);
           this.setArticleOptimizerOutput({
             output: processedOutput,
             highlighted: highlightedResult,
@@ -287,16 +297,18 @@ export default {
     },
     isEmptyResult(text) {
       // 检测是否为空结果或包含"无法获取优化结果"的特殊情况
+      if (!text || text.length < 10) return true;
+
       const lines = text.split('\n').map(line => line.trim()).filter(line => line);
 
-      console.log('检查是否为空结果:', { lines: lines.slice(0, 3), totalLines: lines.length });
+      // 仅在开发环境中输出调试信息
+      if (process.env.NODE_ENV !== 'production') {
+        console.log('检查是否为空结果:', { lines: lines.slice(0, 3), totalLines: lines.length });
+      }
 
-      // 图片中显示的格式检测
-      if (
-        (lines.length <= 3) &&
-        (text.includes('优化结果') || text.includes('修改后')) &&
-        (text.includes('无法获取优化结果') || text.includes('无法') || text.includes('获取失败'))
-      ) {
+      // 使用更高效的正则表达式检测常见的空结果模式
+      const emptyPattern = /优化结果|修改后[\s:：]*$|无法获取优化结果|无法|获取失败/;
+      if ((lines.length <= 3) && emptyPattern.test(text)) {
         return true;
       }
 
@@ -317,45 +329,46 @@ export default {
       await this.optimizeText();
     },
     extractModifiedText(text) {
-      // 输出原始文本进行调试
-      console.log('解析的原始文本:', {
-        textLength: text.length,
-        textPreview: text.substring(0, 200) + (text.length > 200 ? '...' : '')
-      });
+      // 输出原始文本进行调试（仅在开发环境）
+      if (process.env.NODE_ENV !== 'production') {
+        console.log('解析的原始文本:', {
+          textLength: text.length,
+          textPreview: text.substring(0, 100) + (text.length > 100 ? '...' : '')
+        });
+      }
 
-      // 检查返回内容是否包含特定的错误信息
+      // 使用组合条件检查特定错误模式
       if (text.includes('内容优化服务暂时不可用') || text.includes('请稍后重试')) {
-        console.log('检测到特定的服务不可用消息');
-        // 如果AI返回了服务不可用的消息，显示更有帮助的错误提示
+        if (process.env.NODE_ENV !== 'production') {
+          console.log('检测到特定的服务不可用消息');
+        }
         this.$message.error('内容优化服务响应异常，请等待几分钟后再尝试');
         return '';
       }
 
-      // 检查返回内容是否为"无法获取优化结果"字样
-      if (text.includes('无法获取优化结果') || text.trim() === '修改后:') {
-        // 如果包含这个字样，通过toast提示并返回空字符串
+      // 合并检查常见的错误情况
+      if (text.includes('无法获取优化结果') ||
+        text.trim() === '修改后:' ||
+        (text.includes('原文') && !text.includes('修改后'))) {
+        if (process.env.NODE_ENV !== 'production') {
+          console.log('响应中缺少必要的内容部分');
+        }
         this.$message.error('优化未完成，请检查网络连接并稍后再试');
         return '';
       }
 
-      // 检查是否包含"原文"但缺少"修改后"的情况
-      if (text.includes('原文') && !text.includes('修改后')) {
-        console.log('响应中包含原文但缺少修改后部分');
-        this.$message.error('AI服务未能完成内容优化，请稍后重试');
-        return '';
-      }
-
-      // 检查AI返回的内容格式
-      // 如果AI已经按要求返回了"修改后"格式的内容
-      const modifiedPattern = /修改后[:：]([\s\S]*)/;
+      // 使用更精确的正则表达式提取修改后内容
+      const modifiedPattern = /修改后[:：]\s*([\s\S]*)/;
       const match = text.match(modifiedPattern);
 
-      // 记录匹配结果
-      console.log('修改后匹配结果:', {
-        hasMatch: !!match,
-        matchGroups: match ? match.length : 0,
-        matchContent: match ? match[1]?.substr(0, 100) + (match[1]?.length > 100 ? '...' : '') : 'No match'
-      });
+      // 日志记录匹配结果（仅在开发环境）
+      if (process.env.NODE_ENV !== 'production') {
+        console.log('修改后匹配结果:', {
+          hasMatch: !!match,
+          matchGroups: match ? match.length : 0,
+          matchPreview: match ? match[1]?.substr(0, 50) + (match[1]?.length > 50 ? '...' : '') : 'No match'
+        });
+      }
 
       if (match && match[1]) {
         const result = match[1].trim();
@@ -368,23 +381,22 @@ export default {
       }
 
       // 尝试另一种常见模式：直接返回优化后的文本而没有"修改后:"标记
-      // 如果文本看起来像是合理的优化结果（不太短并且没有诊断性消息）
       if (text && text.length > this.inputText.length / 2 && !text.includes('无法') && !text.includes('error')) {
-        console.log('没有找到"修改后"标记，但返回了看起来合理的内容');
+        if (process.env.NODE_ENV !== 'production') {
+          console.log('没有找到"修改后"标记，但返回了看起来合理的内容');
+        }
         return this.cleanMarkdown(text);
       }
 
-      // 如果没有找到"修改后"标记，则保留完整内容
-      // 只做基本的清理，避免丢失内容
+      // 如果没有找到标准格式，则进行基本清理并返回
       return this.cleanMarkdown(text);
     },
     cleanMarkdown(text) {
-      // 只移除明显的markdown标记，保留所有实际内容
+      // 使用单个正则表达式简化markdown清理过程
       return text
-        .replace(/\*\*(.*?)\*\*/g, '$1') // 移除粗体 **text**
-        .replace(/\*(.*?)\*/g, '$1')     // 移除斜体 *text*
-        .replace(/```.*?```/gs, '')      // 移除代码块
-        .replace(/`(.*?)`/g, '$1')       // 移除内联代码
+        .replace(/(\*\*|`)(.*?)\1/g, '$2') // 同时处理粗体和内联代码
+        .replace(/\*(.*?)\*/g, '$1')       // 处理斜体
+        .replace(/```.*?```/gs, '')        // 删除代码块
         .trim();
     },
     generateHighlightedDiff(originalText, modifiedText) {
