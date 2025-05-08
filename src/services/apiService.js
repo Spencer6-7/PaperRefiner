@@ -3,7 +3,7 @@ import axios from 'axios';
 // 默认值，将被用户自定义配置覆盖
 const DEFAULT_API_URL = 'https://voapi.killerbest.com';
 const DEFAULT_API_KEY = 'sk-McarwsWe1KbApdcT8gkB6KmhsbNNUHvfz6C1LN7VjThovXpX'; // 替换为实际API密钥
-const DEFAULT_MODEL_NAME = 'gemini-2.5-pro-exp-03-25';
+const DEFAULT_MODEL_NAME = 'gemini-2.5-flash-preview-04-17';
 
 // 从本地存储获取API配置
 export const getApiConfig = () => {
