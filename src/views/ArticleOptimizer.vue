@@ -73,7 +73,7 @@
         </el-form-item>
 
         <el-form-item label="模型名称">
-          <el-input v-model="apiSettings.modelName" placeholder="请输入模型名称，默认: gemini-2.5-pro-exp-03-25"></el-input>
+          <el-input v-model="apiSettings.modelName" placeholder="请输入模型名称，默认: gemini-2.5-flash-preview-04-17"></el-input>
         </el-form-item>
 
         <div class="api-vip-tip">
