@@ -66,22 +66,19 @@
       <el-form :model="apiSettings" label-width="120px" label-position="left">
         <el-form-item label="API地址">
           <el-input v-model="apiSettings.apiUrl" placeholder="如: https://api.example.com"></el-input>
-          <div class="form-tip">默认: https://voapi.killerbest.com</div>
         </el-form-item>
 
         <el-form-item label="API密钥">
-          <el-input v-model="apiSettings.apiKey" placeholder="请输入API密钥" show-password></el-input>
-          <div class="form-tip">通常以sk-开头</div>
+          <el-input v-model="apiSettings.apiKey" placeholder="请输入API密钥，通常以sk-开头" show-password></el-input>
         </el-form-item>
 
         <el-form-item label="模型名称">
-          <el-input v-model="apiSettings.modelName" placeholder="请输入模型名称"></el-input>
-          <div class="form-tip">默认: gemini-2.5-pro-exp-03-25</div>
+          <el-input v-model="apiSettings.modelName" placeholder="请输入模型名称，默认: gemini-2.5-pro-exp-03-25"></el-input>
         </el-form-item>
 
         <div class="api-vip-tip">
           <el-alert type="success" show-icon title="使用自定义API可享受无限制使用权限"
-            description="当您同时设置了自定义API地址和API密钥，将不受每日使用次数的限制。" :closable="false">
+            description="当您同时设置了API地址和API密钥，将不受每日使用次数的限制。如有需要，请自行联系我获取" :closable="false">
           </el-alert>
         </div>
 
@@ -120,7 +117,7 @@ export default {
       loadingDots: '',
       loadingInterval: null,
       usageCount: 0,
-      usageLimit: 20,
+      usageLimit: 5,
       usageLimitReached: false,
       // API设置相关
       apiSettingsVisible: false,
@@ -128,7 +125,9 @@ export default {
         apiUrl: '',
         apiKey: '',
         modelName: ''
-      }
+      },
+      // 添加此属性用于触发计算属性更新
+      apiConfigVersion: 0
     }
   },
   computed: {
@@ -155,11 +154,15 @@ export default {
     },
     // 检查用户是否使用自定义API (同时提供了API地址和API密钥)
     hasCustomApiConfig() {
+      // 使用apiConfigVersion触发计算属性更新
+      this.apiConfigVersion; // 读取此属性，确保在它变化时重新计算
+
       const customApiUrl = localStorage.getItem('customApiUrl');
       const customApiKey = localStorage.getItem('customApiKey');
       const result = !!(customApiUrl && customApiKey);
 
       console.log('检查自定义API配置状态:', {
+        apiConfigVersion: this.apiConfigVersion,
         customApiUrl: customApiUrl || '(未设置)',
         customApiKey: customApiKey ? '已设置' : '未设置',
         结果: result ? '使用自定义API' : '使用默认API'
@@ -186,6 +189,42 @@ export default {
       this.loadApiSettings(); // 确保显示最新设置
       this.apiSettingsVisible = true;
     },
+    resetApiSettings() {
+      // 检查是否从自定义API切换到默认API
+      const wasCustom = this.hasCustomApiConfig;
+
+      resetApiConfig();
+      this.loadApiSettings();
+
+      // 增加版本号触发计算属性更新
+      this.apiConfigVersion++;
+
+      // 重新检查使用限制，在切换回默认API时恢复使用次数限制
+      this.checkUsageLimit();
+
+      // 强制刷新组件状态
+      this.$forceUpdate();
+
+      // 为确保状态全部更新，添加一个延迟刷新
+      setTimeout(() => {
+        this.$forceUpdate();
+        console.log('延迟刷新后状态：', {
+          apiConfigVersion: this.apiConfigVersion,
+          使用自定义API: this.hasCustomApiConfig,
+          usageLimitReached: this.usageLimitReached
+        });
+      }, 100);
+
+      if (wasCustom) {
+        this.$message({
+          message: '已恢复默认API设置，将受到每日使用次数限制',
+          type: 'warning',
+          duration: 3000
+        });
+      } else {
+        this.$message.info('已恢复默认API设置');
+      }
+    },
     saveApiSettings() {
       // 检查是否从自定义API切换到默认API
       const wasCustom = this.hasCustomApiConfig;
@@ -201,18 +240,26 @@ export default {
         this.apiSettings.modelName
       );
 
+      // 增加版本号触发计算属性更新
+      this.apiConfigVersion++;
+
       // 保存后重新检查使用限制，如果用户填写了自定义API信息，需要刷新显示
       this.checkUsageLimit();
 
-      // 检查localStorage中是否成功保存了设置
-      console.log('保存后状态:', {
-        使用自定义API: this.hasCustomApiConfig,
-        存储中_apiUrl: localStorage.getItem('customApiUrl') || '(空)',
-        存储中_apiKey: localStorage.getItem('customApiKey') ? '已设置' : '(空)',
-        usageLimitReached: this.usageLimitReached
-      });
+      // 强制刷新组件状态
+      this.$forceUpdate();
 
-      // 检查现在的状态，判断是否需要显示额外提示
+      // 为确保状态全部更新，添加一个延迟刷新
+      setTimeout(() => {
+        this.$forceUpdate();
+        console.log('延迟刷新后状态：', {
+          apiConfigVersion: this.apiConfigVersion,
+          使用自定义API: this.hasCustomApiConfig,
+          usageLimitReached: this.usageLimitReached
+        });
+      }, 100);
+
+      // 检查localStorage中是否成功保存了设置
       if (wasCustom && !this.hasCustomApiConfig) {
         // 用户清空了API地址或API密钥，从自定义API切换回默认API
         this.$message({
@@ -233,26 +280,6 @@ export default {
       }
 
       this.apiSettingsVisible = false;
-    },
-    resetApiSettings() {
-      // 检查是否从自定义API切换到默认API
-      const wasCustom = this.hasCustomApiConfig;
-
-      resetApiConfig();
-      this.loadApiSettings();
-
-      // 重新检查使用限制，在切换回默认API时恢复使用次数限制
-      this.checkUsageLimit();
-
-      if (wasCustom) {
-        this.$message({
-          message: '已恢复默认API设置，将受到每日使用次数限制',
-          type: 'warning',
-          duration: 3000
-        });
-      } else {
-        this.$message.info('已恢复默认API设置');
-      }
     },
     checkUsageLimit() {
       // 如果用户同时提供了自定义API地址和密钥，则不受使用次数限制
